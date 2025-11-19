@@ -20,8 +20,9 @@ import (
 const (
 	configurationPath = "configuration/configuration.yaml"
 	goodSpreadString = "0.08"
-	goodBidString = "0.2"
-	goodAskString = "0.8"
+	goodBidString = "0.25"
+	goodAskString = "0.75"
+	enableSpreadColors = false
 )
 
 var configuration *Configuration
@@ -154,15 +155,15 @@ func printTable(symbols []symbolData) {
 		green := color.New(color.FgGreen).SprintFunc()
 		red := color.New(color.FgRed).SprintFunc()
 		bidString := getDecimalString(data.bestBid)
-		if data.change < 0.0 && data.bestBid.GreaterThanOrEqual(goodBid) {
+		if data.change < 0.0 && data.bestBid != nil && data.bestBid.GreaterThanOrEqual(goodBid) {
 			bidString = green(bidString)
 		}
 		askString := getDecimalString(data.bestAsk)
-		if data.change > 0.0 && data.bestAsk.LessThanOrEqual(goodAsk) {
+		if data.change > 0.0 && data.bestAsk != nil && data.bestAsk.LessThanOrEqual(goodAsk) {
 			askString = green(askString)
 		}
 		spreadString := getDecimalString(data.spread)
-		if data.spread.LessThanOrEqual(goodSpread) {
+		if enableSpreadColors && data.spread != nil && data.spread.LessThanOrEqual(goodSpread) {
 			spreadString = green(spreadString)
 		}
 		changeString := fmt.Sprintf("%+.2f%%", data.change)
@@ -199,4 +200,5 @@ func printTable(symbols []symbolData) {
 	table.Header(header)
 	table.Bulk(rows)
 	table.Render()
+	fmt.Printf("\n")
 }
