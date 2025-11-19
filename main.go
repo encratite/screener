@@ -11,6 +11,7 @@ import (
 	"github.com/encratite/commons"
 	"github.com/encratite/gamma"
 	"github.com/encratite/yahoo"
+	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/tw"
 	"github.com/shopspring/decimal"
@@ -18,6 +19,9 @@ import (
 
 const (
 	configurationPath = "configuration/configuration.yaml"
+	goodSpreadString = "0.08"
+	goodBidString = "0.2"
+	goodAskString = "0.8"
 )
 
 var configuration *Configuration
@@ -60,7 +64,6 @@ func runScreener() {
 		if err != nil {
 			log.Fatalf("Failed to retrieve market: %v", err)
 		}
-		// fmt.Printf("%s: bestBid = %.2f, bestAsk = %.2f, spread = %.2f\n", symbol.Symbol, market.BestBid, market.BestAsk, market.Spread)
 		markets = append(markets, market)
 	}
 	assetIDs := gamma.GetAssetIDs(markets)
@@ -120,7 +123,18 @@ func getOrderSummary(summary []gamma.OrderSummary) *decimal.Decimal {
 	}
 }
 
+func mustParseDecimal(value string) decimal.Decimal {
+	output, err := decimal.NewFromString(value)
+	if err != nil {
+		log.Fatalf("Failed to parse decimal: %v", err)
+	}
+	return output
+}
+
 func printTable(symbols []symbolData) {
+	goodSpread := mustParseDecimal(goodSpreadString)
+	goodBid := mustParseDecimal(goodBidString)
+	goodAsk := mustParseDecimal(goodAskString)
 	header := []string{
 		"Symbol",
 		"Best Bid",
@@ -137,12 +151,32 @@ func printTable(symbols []symbolData) {
 				return "N/A"
 			}
 		}
+		green := color.New(color.FgGreen).SprintFunc()
+		red := color.New(color.FgRed).SprintFunc()
+		bidString := getDecimalString(data.bestBid)
+		if data.change < 0.0 && data.bestBid.GreaterThanOrEqual(goodBid) {
+			bidString = green(bidString)
+		}
+		askString := getDecimalString(data.bestAsk)
+		if data.change > 0.0 && data.bestAsk.LessThanOrEqual(goodAsk) {
+			askString = green(askString)
+		}
+		spreadString := getDecimalString(data.spread)
+		if data.spread.LessThanOrEqual(goodSpread) {
+			spreadString = green(spreadString)
+		}
+		changeString := fmt.Sprintf("%+.2f%%", data.change)
+		if data.change >= 0 {
+			changeString = green(changeString)
+		} else {
+			changeString = red(changeString)
+		}
 		row := []string{
 			data.symbol,
-			getDecimalString(data.bestBid),
-			getDecimalString(data.bestAsk),
-			getDecimalString(data.spread),
-			fmt.Sprintf("%+.2f%%", data.change),
+			bidString,
+			askString,
+			spreadString,
+			changeString,
 		}
 		rows = append(rows, row)
 	}
