@@ -1,8 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"slices"
 	"strings"
@@ -46,21 +48,26 @@ type symbolData struct {
 }
 
 func main() {
+	tomorrow := flag.Bool("tomorrow", false, "Run screener for tomorrow's daily markets, for use after session close")
+	flag.Parse()
 	loadConfiguration()
-	runScreener()
+	runScreener(*tomorrow)
 }
 
 func loadConfiguration() {
 	configuration = commons.LoadConfiguration(configurationPath, configuration)
 }
 
-func runScreener() {
+func runScreener(tomorrow bool) {
 	markets := []gamma.Market{}
+	date := time.Now()
+	if tomorrow {
+		date = date.AddDate(0, 0, 1)
+	}
 	for _, symbol := range configuration.Symbols {
-		now := time.Now()
 		lowerSymbol := strings.ToLower(symbol.Symbol)
-		month := strings.ToLower(now.Month().String())
-		slug := fmt.Sprintf("%s-up-or-down-on-%s-%02d-%d", lowerSymbol, month, now.Day(), now.Year())
+		month := strings.ToLower(date.Month().String())
+		slug := fmt.Sprintf("%s-up-or-down-on-%s-%02d-%d", lowerSymbol, month, date.Day(), date.Year())
 		market, err := gamma.GetMarket(slug)
 		if err != nil {
 			log.Fatalf("Failed to retrieve market: %v", err)
@@ -166,11 +173,16 @@ func printTable(symbols []symbolData) {
 		if enableSpreadColors && data.spread != nil && data.spread.LessThanOrEqual(goodSpread) {
 			spreadString = green(spreadString)
 		}
-		changeString := fmt.Sprintf("%+.2f%%", data.change)
-		if data.change >= 0 {
-			changeString = green(changeString)
+		var changeString string
+		if !math.IsNaN(data.change) {
+			changeString = fmt.Sprintf("%+.2f%%", data.change)
+			if data.change >= 0 {
+				changeString = green(changeString)
+			} else {
+				changeString = red(changeString)
+			}
 		} else {
-			changeString = red(changeString)
+			changeString = "-"
 		}
 		row := []string{
 			data.symbol,
