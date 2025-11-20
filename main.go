@@ -21,9 +21,7 @@ import (
 
 const (
 	configurationPath = "configuration/configuration.yaml"
-	goodSpreadString = "0.08"
-	goodBidString = "0.25"
-	goodAskString = "0.75"
+	goodPriceMaxString = "0.75"
 	enableSpreadColors = false
 )
 
@@ -41,8 +39,8 @@ type ScreenerSymbol struct {
 type symbolData struct {
 	symbol string
 	yahoo string
-	bestBid *decimal.Decimal
-	bestAsk *decimal.Decimal
+	yes *decimal.Decimal
+	no *decimal.Decimal
 	spread *decimal.Decimal
 	change float64
 }
@@ -82,12 +80,10 @@ func runScreener(tomorrow bool) {
 			index := slices.Index(assetIDs, message.AssetID)
 			if index >= 0 {
 				symbol := configuration.Symbols[index]
-				bestBid := getOrderSummary(message.Bids)
-				bestAsk := getOrderSummary(message.Asks)
-				var spread *decimal.Decimal
-				if bestBid != nil && bestAsk != nil {
-					spreadValue := bestAsk.Sub(*bestBid)
-					spread = &spreadValue
+				yes := getOrderSummary(message.Asks)
+				no := getOrderSummary(message.Bids)
+				if no != nil {
+					*no = decimal.NewFromInt(1).Sub(*no)
 				}
 				yahooSymbol := symbol.Symbol
 				if symbol.Yahoo != "" {
@@ -100,9 +96,8 @@ func runScreener(tomorrow bool) {
 				data := symbolData{
 					symbol: symbol.Symbol,
 					yahoo: symbol.Yahoo,
-					bestBid: bestBid,
-					bestAsk: bestAsk,
-					spread: spread,
+					yes: yes,
+					no: no,
 					change: change,
 				}
 				symbols[index] = data
@@ -140,14 +135,11 @@ func mustParseDecimal(value string) decimal.Decimal {
 }
 
 func printTable(symbols []symbolData) {
-	goodSpread := mustParseDecimal(goodSpreadString)
-	goodBid := mustParseDecimal(goodBidString)
-	goodAsk := mustParseDecimal(goodAskString)
+	goodPriceMax := mustParseDecimal(goodPriceMaxString)
 	header := []string{
 		"Symbol",
-		"Best Bid",
-		"Best Ask",
-		"Spread",
+		"Yes Price",
+		"No Price",
 		"Change",
 	}
 	rows := [][]string{}
@@ -161,17 +153,13 @@ func printTable(symbols []symbolData) {
 		}
 		green := color.New(color.FgGreen).SprintFunc()
 		red := color.New(color.FgRed).SprintFunc()
-		bidString := getDecimalString(data.bestBid)
-		if data.change < 0.0 && data.bestBid != nil && data.bestBid.GreaterThanOrEqual(goodBid) {
-			bidString = green(bidString)
+		yesString := getDecimalString(data.yes)
+		if data.change > 0.0 && data.yes != nil && data.yes.LessThanOrEqual(goodPriceMax) {
+			yesString = green(yesString)
 		}
-		askString := getDecimalString(data.bestAsk)
-		if data.change > 0.0 && data.bestAsk != nil && data.bestAsk.LessThanOrEqual(goodAsk) {
-			askString = green(askString)
-		}
-		spreadString := getDecimalString(data.spread)
-		if enableSpreadColors && data.spread != nil && data.spread.LessThanOrEqual(goodSpread) {
-			spreadString = green(spreadString)
+		noString := getDecimalString(data.no)
+		if data.change < 0.0 && data.no != nil && data.no.LessThanOrEqual(goodPriceMax) {
+			noString = green(noString)
 		}
 		var changeString string
 		if !math.IsNaN(data.change) {
@@ -186,9 +174,8 @@ func printTable(symbols []symbolData) {
 		}
 		row := []string{
 			data.symbol,
-			bidString,
-			askString,
-			spreadString,
+			yesString,
+			noString,
 			changeString,
 		}
 		rows = append(rows, row)
