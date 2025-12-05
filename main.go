@@ -65,10 +65,10 @@ func runScreener(tomorrow bool) {
 	for _, symbol := range configuration.Symbols {
 		lowerSymbol := strings.ToLower(symbol.Symbol)
 		month := strings.ToLower(date.Month().String())
-		slug := fmt.Sprintf("%s-up-or-down-on-%s-%02d-%d", lowerSymbol, month, date.Day(), date.Year())
+		slug := fmt.Sprintf("%s-up-or-down-on-%s-%d-%d", lowerSymbol, month, date.Day(), date.Year())
 		market, err := gamma.GetMarket(slug)
-		if err != nil {
-			log.Fatalf("Failed to retrieve market: %v", err)
+		if err != nil || market.Slug == "" {
+			log.Fatalf("Failed to retrieve market %s for symbol %s", slug, symbol.Symbol)
 		}
 		markets = append(markets, market)
 	}
