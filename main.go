@@ -21,7 +21,8 @@ import (
 
 const (
 	configurationPath = "configuration/configuration.yaml"
-	goodPriceMaxString = "0.75"
+	mediocrePriceString = "0.75"
+	goodPriceString = "0.50"
 	enableSpreadColors = false
 )
 
@@ -135,7 +136,8 @@ func mustParseDecimal(value string) decimal.Decimal {
 }
 
 func printTable(symbols []symbolData) {
-	goodPriceMax := mustParseDecimal(goodPriceMaxString)
+	goodPrice := mustParseDecimal(goodPriceString)
+	mediocrePrice := mustParseDecimal(mediocrePriceString)
 	header := []string{
 		"Symbol",
 		"Yes Price",
@@ -152,14 +154,23 @@ func printTable(symbols []symbolData) {
 			}
 		}
 		green := color.New(color.FgGreen).SprintFunc()
+		yellow := color.New(color.FgYellow).SprintFunc()
 		red := color.New(color.FgRed).SprintFunc()
 		yesString := getDecimalString(data.yes)
-		if data.change > 0.0 && data.yes != nil && data.yes.LessThanOrEqual(goodPriceMax) {
-			yesString = green(yesString)
+		if data.change > 0.0 && data.yes != nil {
+			if data.yes.LessThanOrEqual(goodPrice) {
+				yesString = green(yesString)
+			} else if data.yes.LessThanOrEqual(mediocrePrice) {
+				yesString = yellow(yesString)
+			}
 		}
 		noString := getDecimalString(data.no)
-		if data.change < 0.0 && data.no != nil && data.no.LessThanOrEqual(goodPriceMax) {
-			noString = green(noString)
+		if data.change < 0.0 && data.no != nil {
+			if data.no.LessThanOrEqual(goodPrice) {
+				noString = green(noString)
+			} else if data.no.LessThanOrEqual(mediocrePrice) {
+				noString = yellow(noString)
+			}
 		}
 		var changeString string
 		if !math.IsNaN(data.change) {
