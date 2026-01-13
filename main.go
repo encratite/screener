@@ -49,12 +49,8 @@ type symbolData struct {
 func main() {
 	tomorrow := flag.Bool("tomorrow", false, "Run screener for tomorrow's daily markets, for use after session close")
 	flag.Parse()
-	loadConfiguration()
+	configuration = commons.LoadConfiguration[Configuration](configurationPath)
 	runScreener(*tomorrow)
-}
-
-func loadConfiguration() {
-	configuration = commons.LoadConfiguration(configurationPath, configuration)
 }
 
 func runScreener(tomorrow bool) {
