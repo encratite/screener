@@ -47,17 +47,22 @@ type symbolData struct {
 }
 
 func main() {
-	tomorrow := flag.Bool("tomorrow", false, "Run screener for tomorrow's daily markets, for use after session close")
+	dateString := flag.String("date", "", "Run screener for a specific date")
 	flag.Parse()
 	configuration = commons.LoadConfiguration[Configuration](configurationPath)
-	runScreener(*tomorrow)
+	var date *time.Time
+	if *dateString != "" {
+		dateValue := commons.MustParseTime(*dateString)
+		date = &dateValue
+	}
+	runScreener(date)
 }
 
-func runScreener(tomorrow bool) {
+func runScreener(date *time.Time) {
 	markets := []gamma.Market{}
-	date := time.Now()
-	if tomorrow {
-		date = date.AddDate(0, 0, 1)
+	if date == nil {
+		dateValue := time.Now()
+		date = &dateValue
 	}
 	for _, symbol := range configuration.Symbols {
 		lowerSymbol := strings.ToLower(symbol.Symbol)
