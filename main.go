@@ -23,7 +23,9 @@ const (
 	configurationPath = "configuration/configuration.yaml"
 	mediocrePriceString = "0.75"
 	goodPriceString = "0.50"
+	goodSpreadString = "0.5"
 	enableSpreadColors = false
+	enableYahoo = true
 )
 
 var configuration *Configuration
@@ -91,9 +93,15 @@ func runScreener(date *time.Time) {
 				if symbol.Yahoo != "" {
 					yahooSymbol = symbol.Yahoo
 				}
-				change, err := yahoo.GetChange(yahooSymbol)
-				if err != nil {
-					log.Fatalf("Failed to retrieve last close for %s: %v", symbol.Symbol, err)
+				var change float64
+				if enableYahoo {
+					value, err := yahoo.GetChange(yahooSymbol)
+					if err != nil {
+						log.Fatalf("Failed to retrieve last close for %s: %v", symbol.Symbol, err)
+					}
+					change = value
+				} else {
+					change = math.NaN()
 				}
 				data := symbolData{
 					symbol: symbol.Symbol,
@@ -139,10 +147,12 @@ func mustParseDecimal(value string) decimal.Decimal {
 func printTable(symbols []symbolData) {
 	goodPrice := mustParseDecimal(goodPriceString)
 	mediocrePrice := mustParseDecimal(mediocrePriceString)
+	goodSpread := mustParseDecimal(goodSpreadString)
 	header := []string{
 		"Symbol",
 		"Yes Price",
 		"No Price",
+		"Spread",
 		"Change",
 	}
 	rows := [][]string{}
@@ -151,14 +161,14 @@ func printTable(symbols []symbolData) {
 			if d != nil {
 				return d.StringFixed(2)
 			} else {
-				return "N/A"
+				return "-"
 			}
 		}
 		green := color.New(color.FgGreen).SprintFunc()
 		yellow := color.New(color.FgYellow).SprintFunc()
 		red := color.New(color.FgRed).SprintFunc()
 		yesString := getDecimalString(data.yes)
-		if data.change > 0.0 && data.yes != nil {
+		if data.change > 0.0 && data.yes != nil && data.yes.IsPositive() {
 			if data.yes.LessThanOrEqual(goodPrice) {
 				yesString = green(yesString)
 			} else if data.yes.LessThanOrEqual(mediocrePrice) {
@@ -166,15 +176,24 @@ func printTable(symbols []symbolData) {
 			}
 		}
 		noString := getDecimalString(data.no)
-		if data.change < 0.0 && data.no != nil {
+		if data.change < 0.0 && data.no != nil && data.no.IsPositive() {
 			if data.no.LessThanOrEqual(goodPrice) {
 				noString = green(noString)
 			} else if data.no.LessThanOrEqual(mediocrePrice) {
 				noString = yellow(noString)
 			}
 		}
+		spreadString := "-"
+		if data.yes != nil && data.no != nil {
+			one := decimal.NewFromInt(1)
+			spread := data.yes.Add(*data.no).Sub(one)
+			spreadString = getDecimalString(&spread)
+			if spread.GreaterThanOrEqual(goodSpread) {
+				spreadString = yellow(spreadString)
+			}
+		}
 		var changeString string
-		if !math.IsNaN(data.change) {
+		if !math.IsNaN(data.change) && !math.IsInf(data.change, 1) && !math.IsInf(data.change, -1) {
 			changeString = fmt.Sprintf("%+.2f%%", data.change)
 			if data.change >= 0 {
 				changeString = green(changeString)
@@ -188,12 +207,14 @@ func printTable(symbols []symbolData) {
 			data.symbol,
 			yesString,
 			noString,
+			spreadString,
 			changeString,
 		}
 		rows = append(rows, row)
 	}
 	alignments := []tw.Align{
 		tw.AlignDefault,
+		tw.AlignRight,
 		tw.AlignRight,
 		tw.AlignRight,
 		tw.AlignRight,
